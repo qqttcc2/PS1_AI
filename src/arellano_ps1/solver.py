@@ -55,9 +55,15 @@ def solve_government_given_prices(
     vc = np.zeros((n_b, n_y), dtype=float)
     vo = np.maximum(vc, v_default)
     policy_idx = np.zeros((n_b, n_y), dtype=int)
+    row_idx = np.arange(n_b)
 
     b_current = b_grid[:, None]
     b_prime = b_grid[None, :]
+    utility_cache = []
+    for j in range(n_y):
+        y_val = y_grid[j]
+        repayment_matrix = y_val + b_current - (q[:, j][None, :] * b_prime)
+        utility_cache.append(_utility_log(repayment_matrix))
 
     converged = False
     iterations = config.max_inner_iter
@@ -68,11 +74,9 @@ def solve_government_given_prices(
         policy_new = np.empty_like(policy_idx)
 
         for j in range(n_y):
-            y_val = y_grid[j]
-            repayment_matrix = y_val + b_current - (q[:, j][None, :] * b_prime)
-            rhs = _utility_log(repayment_matrix) + config.beta * expected_vo[:, j][None, :]
+            rhs = utility_cache[j] + config.beta * expected_vo[:, j][None, :]
             policy_new[:, j] = np.argmax(rhs, axis=1)
-            vc_new[:, j] = rhs[np.arange(n_b), policy_new[:, j]]
+            vc_new[:, j] = rhs[row_idx, policy_new[:, j]]
 
         vo_new = np.maximum(vc_new, v_default)
         diff = np.max(np.abs(vo_new - vo))
